@@ -10,8 +10,8 @@ interface CardProps {
 export default function Card({ children, className = '', hover = false, onClick }: CardProps) {
   return (
     <div
-      className={`bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.08)] overflow-hidden
-        ${hover ? 'card-press cursor-pointer' : ''}
+      className={`bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden
+        ${hover ? 'card-press cursor-pointer hover:shadow-md hover:shadow-cyan-100/60' : ''}
         ${className}`}
       onClick={onClick}
     >

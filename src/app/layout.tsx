@@ -3,10 +3,11 @@ import "./globals.css";
 import { UserProvider } from '@/context/UserContext';
 
 export const metadata: Metadata = {
-  title: "Đặt Cơm — Hệ thống đặt cơm trả trước",
-  description: "Đặt cơm nhanh chóng, tiện lợi. Nhập mã của bạn, chọn món, xong!",
+  title: "CƠMCƠM — Đặt cơm nhanh, tiện lợi",
+  description: "Đặt cơm nhanh chóng, tiện lợi. Nhập mã của bạn, chọn món, xong! Hệ thống đặt cơm trả trước CƠMCƠM.",
   icons: {
-    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>",
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
 };
 
@@ -15,7 +16,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#F97316",
+  themeColor: "#0891B2",
 };
 
 export default function RootLayout({
