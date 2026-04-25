@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const navItems = [
   { href: '/admin/dashboard', label: 'Tổng quan' },
   { href: '/admin/menus', label: 'Thực đơn' },
+  { href: '/admin/dishes', label: 'Thư viện món' },
   { href: '/admin/users', label: 'Mã người dùng' },
   { href: '/admin/reports', label: 'Báo cáo' },
 ];

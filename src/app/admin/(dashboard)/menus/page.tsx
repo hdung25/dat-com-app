@@ -16,6 +16,9 @@ export default function AdminMenusPage() {
   const [newCutoff, setNewCutoff] = useState('09:00');
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  // Inline edit cutoff
+  const [editDate, setEditDate] = useState<string | null>(null);
+  const [editCutoff, setEditCutoff] = useState('');
 
   useEffect(() => { fetchMenus(); }, []);
 
@@ -55,6 +58,23 @@ export default function AdminMenusPage() {
     } catch { alert('Lỗi cập nhật'); }
   };
 
+  const startEditCutoff = (menu: Menu) => {
+    setEditDate(menu.date);
+    setEditCutoff(menu.cutoff_time || '09:00');
+  };
+
+  const saveCutoff = async (date: string) => {
+    try {
+      await fetch(`/api/admin/menus/${date}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cutoff_time: editCutoff }),
+      });
+      setEditDate(null);
+      fetchMenus();
+    } catch { alert('Lỗi cập nhật giờ'); }
+  };
+
   const deleteMenu = async (date: string) => {
     if (!confirm(`Xóa menu ngày ${date}?`)) return;
     try {
@@ -76,12 +96,20 @@ export default function AdminMenusPage() {
           <h1 className="text-lg font-semibold text-gray-900">Thực đơn</h1>
           <p className="text-sm text-gray-500">Quản lý thực đơn theo ngày</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {showForm ? 'Đóng' : 'Tạo menu'}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/dishes"
+            className="px-3 py-2 border border-gray-200 hover:border-orange-400 text-gray-600 hover:text-orange-600 text-sm font-medium rounded-lg transition-colors"
+          >
+            📚 Thư viện món
+          </Link>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {showForm ? 'Đóng' : 'Tạo menu'}
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -96,7 +124,7 @@ export default function AdminMenusPage() {
               />
             </div>
             <div className="w-32">
-              <label className="block text-xs text-gray-500 mb-1">Giờ chốt</label>
+              <label className="block text-xs text-gray-500 mb-1">Giờ chốt đơn</label>
               <input type="time" value={newCutoff}
                 onChange={e => setNewCutoff(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 transition-colors"
@@ -110,6 +138,9 @@ export default function AdminMenusPage() {
               </button>
             </div>
           </div>
+          <p className="text-xs text-gray-400 mt-2">
+            💡 Sau khi tạo, vào &quot;Quản lý món&quot; để chọn món từ thư viện
+          </p>
         </div>
       )}
 
@@ -123,7 +154,7 @@ export default function AdminMenusPage() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Ngày</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Giờ chốt</th>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Giờ chốt đơn</th>
                 <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Trạng thái</th>
                 <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500">Thao tác</th>
               </tr>
@@ -132,7 +163,48 @@ export default function AdminMenusPage() {
               {menus.map((menu) => (
                 <tr key={menu.date} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">{menu.date}</td>
-                  <td className="px-4 py-3 text-gray-500">{menu.cutoff_time}</td>
+
+                  {/* Cutoff time — inline edit */}
+                  <td className="px-4 py-3">
+                    {editDate === menu.date ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time"
+                          value={editCutoff}
+                          onChange={e => setEditCutoff(e.target.value)}
+                          autoFocus
+                          className="px-2 py-1 text-sm border border-orange-300 rounded-lg focus:outline-none focus:border-orange-500"
+                        />
+                        <button
+                          onClick={() => saveCutoff(menu.date)}
+                          className="text-xs text-green-600 hover:text-green-800 font-medium"
+                        >Lưu</button>
+                        <button
+                          onClick={() => setEditDate(null)}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                        >Hủy</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditCutoff(menu)}
+                        className="flex items-center gap-1.5 text-gray-500 hover:text-orange-600 transition-colors group"
+                        title="Nhấn để sửa giờ chốt"
+                      >
+                        <span className={`font-mono ${!menu.cutoff_time || menu.cutoff_time === '00:00' ? 'text-red-400' : ''}`}>
+                          {menu.cutoff_time || '—'}
+                        </span>
+                        <svg
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          width="12" height="12" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="2"
+                        >
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                      </button>
+                    )}
+                  </td>
+
                   <td className="px-4 py-3">
                     <button onClick={() => toggleActive(menu.date, menu.is_active)}
                       className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors
@@ -144,6 +216,7 @@ export default function AdminMenusPage() {
                       {menu.is_active ? 'Đang mở' : 'Đã tắt'}
                     </button>
                   </td>
+
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <Link href={`/admin/menus/${menu.date}`}

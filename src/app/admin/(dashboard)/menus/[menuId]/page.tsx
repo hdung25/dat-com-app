@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
@@ -22,6 +22,12 @@ interface MenuInfo {
   is_active: boolean;
 }
 
+interface LibraryDish {
+  id: string;
+  name: string;
+  price: number;
+}
+
 function formatPrice(price: number): string {
   return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
 }
@@ -32,9 +38,15 @@ export default function AdminMenuDetailPage() {
   const [menu, setMenu] = useState<MenuInfo | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', price: '', max_quantity: '' });
+  // Mode: 'library' = chọn từ thư viện, 'manual' = nhập tay
+  const [addMode, setAddMode] = useState<'none' | 'library' | 'manual'>('none');
+  const [libraryDishes, setLibraryDishes] = useState<LibraryDish[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set());
+  const [maxQuantityMap, setMaxQuantityMap] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
+  // Manual form
+  const [formData, setFormData] = useState({ name: '', price: '', max_quantity: '' });
 
   useEffect(() => {
     fetchMenu();
@@ -54,7 +66,69 @@ export default function AdminMenuDetailPage() {
     }
   };
 
-  const addItem = async () => {
+  const openLibrary = async () => {
+    setAddMode('library');
+    setSelectedDishes(new Set());
+    setMaxQuantityMap({});
+    if (libraryDishes.length === 0) {
+      setLibraryLoading(true);
+      try {
+        const res = await fetch('/api/admin/dishes');
+        const data = await res.json();
+        setLibraryDishes(data.dishes || []);
+      } catch { /* ignore */ }
+      finally { setLibraryLoading(false); }
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedDishes(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const addFromLibrary = async () => {
+    if (selectedDishes.size === 0) return;
+    setAdding(true);
+    try {
+      const toAdd = libraryDishes.filter(d => selectedDishes.has(d.id));
+      // Already in menu?
+      const existingNames = new Set(items.map(i => i.name.toLowerCase()));
+      const filtered = toAdd.filter(d => !existingNames.has(d.name.toLowerCase()));
+
+      if (filtered.length === 0) {
+        alert('Các món đã chọn đều đã có trong menu này rồi.');
+        setAdding(false);
+        return;
+      }
+
+      await Promise.all(
+        filtered.map(dish =>
+          fetch(`/api/admin/menus/${menuId}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: dish.name,
+              price: dish.price,
+              max_quantity: maxQuantityMap[dish.id] ? Number(maxQuantityMap[dish.id]) : null,
+            }),
+          })
+        )
+      );
+      setAddMode('none');
+      setSelectedDishes(new Set());
+      fetchMenu();
+    } catch {
+      alert('Lỗi thêm món');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const addManual = async () => {
     if (!formData.name) return;
     setAdding(true);
     try {
@@ -70,7 +144,7 @@ export default function AdminMenuDetailPage() {
       const data = await res.json();
       if (data.success) {
         setFormData({ name: '', price: '', max_quantity: '' });
-        setShowForm(false);
+        setAddMode('none');
         fetchMenu();
       } else {
         alert(data.error);
@@ -101,7 +175,7 @@ export default function AdminMenuDetailPage() {
       await fetch(`/api/admin/menus/${menuId}/items/${itemId}`, { method: 'DELETE' });
       fetchMenu();
     } catch {
-      alert('Lỗi xóa mon');
+      alert('Lỗi xóa món');
     }
   };
 
@@ -129,15 +203,114 @@ export default function AdminMenuDetailPage() {
             </p>
           )}
         </div>
-        <Button variant="primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Đóng' : '+ Thêm món'}
-        </Button>
+
+        {/* Add buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setAddMode(addMode === 'library' ? 'none' : 'library')}
+            className="text-sm"
+          >
+            {addMode === 'library' ? 'Đóng' : '📚 Chọn từ thư viện'}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => setAddMode(addMode === 'manual' ? 'none' : 'manual')}
+          >
+            {addMode === 'manual' ? 'Đóng' : '+ Nhập tay'}
+          </Button>
+        </div>
       </div>
 
-      {/* Add item form */}
-      {showForm && (
+      {/* Library picker */}
+      {addMode === 'library' && (
         <Card className="p-5 mb-6 animate-slide-down">
-          <h3 className="font-semibold mb-4">Thêm món mới</h3>
+          <h3 className="font-semibold mb-1">Chọn món từ thư viện</h3>
+          <p className="text-xs text-text-secondary mb-4">
+            Chọn một hoặc nhiều món, nhập số lượng tối đa nếu cần, rồi nhấn Thêm vào menu.
+          </p>
+
+          {libraryLoading ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />)}
+            </div>
+          ) : libraryDishes.length === 0 ? (
+            <div className="text-center py-8 text-sm text-text-secondary">
+              Thư viện chưa có món nào.{' '}
+              <Link href="/admin/dishes" className="text-orange-600 hover:underline font-medium">
+                Thêm món vào thư viện →
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2 mb-4 max-h-72 overflow-y-auto pr-1">
+                {libraryDishes.map(dish => {
+                  const alreadyAdded = items.some(i => i.name.toLowerCase() === dish.name.toLowerCase());
+                  const isSelected = selectedDishes.has(dish.id);
+                  return (
+                    <div
+                      key={dish.id}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-colors cursor-pointer
+                        ${alreadyAdded
+                          ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                          : isSelected
+                          ? 'border-orange-400 bg-orange-50'
+                          : 'border-border hover:border-orange-200 bg-white'}`}
+                      onClick={() => !alreadyAdded && toggleSelect(dish.id)}
+                    >
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border-2 shrink-0 transition-colors
+                        ${isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300'}`}>
+                        {isSelected && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-text-primary truncate">{dish.name}</p>
+                        <p className="text-xs text-text-secondary">{dish.price > 0 ? formatPrice(dish.price) : 'Chưa có giá'}</p>
+                      </div>
+                      {alreadyAdded && (
+                        <span className="text-xs text-gray-400 shrink-0">Đã có trong menu</span>
+                      )}
+                      {isSelected && !alreadyAdded && (
+                        <div className="shrink-0" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="number"
+                            placeholder="SL tối đa"
+                            value={maxQuantityMap[dish.id] || ''}
+                            onChange={e => setMaxQuantityMap(prev => ({ ...prev, [dish.id]: e.target.value }))}
+                            className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <span className="text-sm text-text-secondary">
+                  Đã chọn <strong>{selectedDishes.size}</strong> món
+                </span>
+                <Button
+                  variant="primary"
+                  loading={adding}
+                  onClick={addFromLibrary}
+                  className={selectedDishes.size === 0 ? 'opacity-50' : ''}
+                >
+                  Thêm vào menu
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+
+      {/* Manual form */}
+      {addMode === 'manual' && (
+        <Card className="p-5 mb-6 animate-slide-down">
+          <h3 className="font-semibold mb-4">Thêm món mới (nhập tay)</h3>
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-text-secondary mb-1">Tên món *</label>
@@ -171,7 +344,7 @@ export default function AdminMenuDetailPage() {
                 />
               </div>
             </div>
-            <Button variant="primary" loading={adding} onClick={addItem}>
+            <Button variant="primary" loading={adding} onClick={addManual}>
               Thêm món
             </Button>
           </div>
@@ -182,7 +355,7 @@ export default function AdminMenuDetailPage() {
       {items.length === 0 ? (
         <div className="text-center py-12 text-text-secondary">
           <p className="text-4xl mb-3">🍽️</p>
-          <p>Chưa có món nào trong menu này.</p>
+          <p>Chưa có món nào. Chọn từ thư viện hoặc nhập tay.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -193,7 +366,6 @@ export default function AdminMenuDetailPage() {
                   {item.name.charAt(0)}
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-text-primary truncate">{item.name}</h4>
                   <p className="text-sm text-primary font-bold">{formatPrice(item.price)}</p>
@@ -209,7 +381,6 @@ export default function AdminMenuDetailPage() {
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => toggleItem(item.id, item.is_available)}
