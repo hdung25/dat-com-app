@@ -21,17 +21,20 @@ export async function POST(request: NextRequest) {
     const userData = userDoc.data()!;
 
     // Get recent orders (last 10)
+    // Note: avoid combining .where() + .orderBy() on different fields to prevent
+    // requiring a composite Firestore index that may not exist yet.
     const ordersSnapshot = await adminDb.collection('orders')
       .where('user_code', '==', normalizedCode)
-      .orderBy('created_at', 'desc')
-      .limit(10)
       .get();
 
-    const orders = ordersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      created_at: doc.data().created_at?.toDate?.()?.toISOString() || '',
-    }));
+    const orders = ordersSnapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.()?.toISOString() || '',
+      }))
+      .sort((a, b) => (b.created_at > a.created_at ? 1 : -1))
+      .slice(0, 10);
 
     return NextResponse.json({
       valid: true,
