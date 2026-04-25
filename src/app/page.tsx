@@ -86,7 +86,7 @@ export default async function HomePage() {
             <div className="shrink-0 w-16 h-16 rounded-2xl overflow-hidden shadow-lg ring-2 ring-white/20 animate-float">
               <Image
                 src="/logo.png"
-                alt="CƠMCƠM"
+                alt="Super Chef"
                 width={64}
                 height={64}
                 className="object-cover w-full h-full"

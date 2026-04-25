@@ -3,8 +3,8 @@ import "./globals.css";
 import { UserProvider } from '@/context/UserContext';
 
 export const metadata: Metadata = {
-  title: "CƠMCƠM — Đặt cơm nhanh, tiện lợi",
-  description: "Đặt cơm nhanh chóng, tiện lợi. Nhập mã của bạn, chọn món, xong! Hệ thống đặt cơm trả trước CƠMCƠM.",
+  title: "Super Chef — Đặt cơm nhanh, tiện lợi",
+  description: "Đặt cơm nhanh chóng, tiện lợi. Nhập mã của bạn, chọn món, xong! Hệ thống đặt cơm trả trước Super Chef.",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",

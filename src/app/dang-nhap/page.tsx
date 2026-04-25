@@ -46,12 +46,12 @@ export default function LoginPage() {
         {/* Logo + title */}
         <div className="mb-8 text-center">
           <div className="relative w-20 h-20 rounded-3xl overflow-hidden mx-auto mb-4 shadow-lg ring-4 ring-white">
-            <Image src="/logo.png" alt="CƠMCƠM Logo" fill className="object-cover" priority />
+            <Image src="/logo.png" alt="Super Chef Logo" fill className="object-cover" priority />
           </div>
           <h1 className="text-2xl font-extrabold bg-gradient-to-r from-cyan-700 to-sky-600 bg-clip-text text-transparent">
             Chào mừng trở lại!
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Đăng nhập vào tài khoản CƠMCƠM</p>
+          <p className="text-slate-500 text-sm mt-1">Đăng nhập vào tài khoản Super Chef</p>
         </div>
 
         {/* Form */}

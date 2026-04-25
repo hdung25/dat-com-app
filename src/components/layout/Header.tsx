@@ -25,14 +25,14 @@ export default function Header() {
           <div className="relative w-8 h-8 rounded-xl overflow-hidden shadow-md ring-2 ring-cyan-200/50 group-hover:ring-cyan-400/60 transition-all duration-200">
             <Image
               src="/logo.png"
-              alt="CƠMCƠM Logo"
+              alt="Super Chef Logo"
               fill
               className="object-cover"
               priority
             />
           </div>
           <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-cyan-700 to-sky-600 bg-clip-text text-transparent">
-            CƠMCƠM
+            Super Chef
           </span>
         </Link>
 
