@@ -101,7 +101,7 @@ export default function AdminMenusPage() {
             href="/admin/dishes"
             className="px-3 py-2 border border-gray-200 hover:border-orange-400 text-gray-600 hover:text-orange-600 text-sm font-medium rounded-lg transition-colors"
           >
-            📚 Thư viện món
+            Thư viện món
           </Link>
           <button
             onClick={() => setShowForm(!showForm)}
@@ -139,7 +139,7 @@ export default function AdminMenusPage() {
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            💡 Sau khi tạo, vào &quot;Quản lý món&quot; để chọn món từ thư viện
+            Sau khi tạo, vào &quot;Quản lý món&quot; để chọn món từ thư viện
           </p>
         </div>
       )}

@@ -70,15 +70,13 @@ export default function AdminMenuDetailPage() {
     setAddMode('library');
     setSelectedDishes(new Set());
     setMaxQuantityMap({});
-    if (libraryDishes.length === 0) {
-      setLibraryLoading(true);
-      try {
-        const res = await fetch('/api/admin/dishes');
-        const data = await res.json();
-        setLibraryDishes(data.dishes || []);
-      } catch { /* ignore */ }
-      finally { setLibraryLoading(false); }
-    }
+    setLibraryLoading(true);
+    try {
+      const res = await fetch('/api/admin/dishes');
+      const data = await res.json();
+      setLibraryDishes(data.dishes || []);
+    } catch { /* ignore */ }
+    finally { setLibraryLoading(false); }
   };
 
   const toggleSelect = (id: string) => {
@@ -208,10 +206,10 @@ export default function AdminMenuDetailPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
-            onClick={() => setAddMode(addMode === 'library' ? 'none' : 'library')}
+            onClick={() => addMode === 'library' ? setAddMode('none') : openLibrary()}
             className="text-sm"
           >
-            {addMode === 'library' ? 'Đóng' : '📚 Chọn từ thư viện'}
+            {addMode === 'library' ? 'Đóng' : 'Chọn từ thư viện'}
           </Button>
           <Button
             variant="primary"
@@ -354,7 +352,7 @@ export default function AdminMenuDetailPage() {
       {/* Items list */}
       {items.length === 0 ? (
         <div className="text-center py-12 text-text-secondary">
-          <p className="text-4xl mb-3">🍽️</p>
+
           <p>Chưa có món nào. Chọn từ thư viện hoặc nhập tay.</p>
         </div>
       ) : (
