@@ -17,19 +17,40 @@ function getVietnamNow(): { today: string; hours: number; minutes: number } {
 
 export async function POST(request: NextRequest) {
   try {
-    const { code, menuItemId, menuDate, quantity = 1 } = await request.json();
+    const body = await request.json();
 
-    if (!code || !menuItemId || !menuDate) {
+    // Support 2 modes: single item or multi items
+    // Single: { code, menuItemId, menuDate, quantity }
+    // Multi:  { code, menuDate, items: [{ menuItemId, quantity }] }
+    const { code, menuDate } = body;
+
+    if (!code || !menuDate) {
       return NextResponse.json({ success: false, error: 'Thiếu thông tin' }, { status: 400 });
     }
 
     const normalizedCode = code.trim().toUpperCase();
-    const qty = Math.max(1, Math.min(3, Number(quantity)));
+
+    // Normalize to multi-item format
+    let itemRequests: { menuItemId: string; quantity: number }[];
+    if (body.items && Array.isArray(body.items)) {
+      itemRequests = body.items.map((it: { menuItemId: string; quantity?: number }) => ({
+        menuItemId: it.menuItemId,
+        quantity: Math.max(1, Math.min(10, Number(it.quantity) || 1)),
+      }));
+    } else if (body.menuItemId) {
+      itemRequests = [{
+        menuItemId: body.menuItemId,
+        quantity: Math.max(1, Math.min(10, Number(body.quantity) || 1)),
+      }];
+    } else {
+      return NextResponse.json({ success: false, error: 'Thiếu thông tin món' }, { status: 400 });
+    }
+
+    const totalQty = itemRequests.reduce((s, it) => s + it.quantity, 0);
 
     // References
     const userRef = adminDb.collection('users_codes').doc(normalizedCode);
     const menuRef = adminDb.collection('menus').doc(menuDate);
-    const itemRef = menuRef.collection('items').doc(menuItemId);
 
     // Run atomic transaction
     const result = await adminDb.runTransaction(async (transaction) => {
@@ -41,7 +62,7 @@ export async function POST(request: NextRequest) {
       const userData = userDoc.data()!;
 
       // 2. Check remaining portions
-      if (userData.remaining_portions < qty) {
+      if (userData.remaining_portions < totalQty) {
         throw new Error(`Không đủ suất. Bạn chỉ còn ${userData.remaining_portions} phần`);
       }
 
@@ -63,21 +84,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Read menu item
-      const itemDoc = await transaction.get(itemRef);
-      if (!itemDoc.exists || !itemDoc.data()?.is_available) {
-        throw new Error('Món này đã hết');
-      }
-      const itemData = itemDoc.data()!;
-
-      // 6. Check max quantity
-      if (itemData.max_quantity !== null && itemData.max_quantity !== undefined) {
-        if ((itemData.ordered_count || 0) + qty > itemData.max_quantity) {
-          throw new Error('Món này đã hết');
-        }
-      }
-
-      // 7. Check duplicate order
+      // 5. Check duplicate — 1 user chỉ được đặt 1 lần/ngày
       const existingOrders = await adminDb.collection('orders')
         .where('user_code', '==', normalizedCode)
         .where('menu_date', '==', menuDate)
@@ -85,41 +92,76 @@ export async function POST(request: NextRequest) {
         .get();
 
       if (!existingOrders.empty) {
-        throw new Error('Bạn đã đặt cơm hôm nay rồi');
+        throw new Error('Bạn đã đặt cơm hôm nay rồi. Mỗi người chỉ được đặt 1 lần/ngày.');
       }
 
-      // 8. All checks passed — write
-      // Create order document
-      const orderRef = adminDb.collection('orders').doc();
-      transaction.set(orderRef, {
-        user_code: normalizedCode,
-        full_name: userData.full_name,
-        phone: userData.phone,
-        delivery_address: userData.delivery_address,
-        menu_date: menuDate,
-        menu_item_id: menuItemId,
-        item_name: itemData.name,
-        item_price: itemData.price,
-        quantity: qty,
-        created_at: FieldValue.serverTimestamp(),
-      });
+      // 6. Read all items and validate
+      const itemDocs = await Promise.all(
+        itemRequests.map(it => transaction.get(menuRef.collection('items').doc(it.menuItemId)))
+      );
+
+      const orderItems: { name: string; price: number; quantity: number; menuItemId: string }[] = [];
+
+      for (let i = 0; i < itemDocs.length; i++) {
+        const itemDoc = itemDocs[i];
+        const req = itemRequests[i];
+
+        if (!itemDoc.exists || !itemDoc.data()?.is_available) {
+          throw new Error(`Món "${itemDoc.data()?.name || req.menuItemId}" đã hết`);
+        }
+        const itemData = itemDoc.data()!;
+
+        // Check max quantity
+        if (itemData.max_quantity !== null && itemData.max_quantity !== undefined) {
+          if ((itemData.ordered_count || 0) + req.quantity > itemData.max_quantity) {
+            throw new Error(`Món "${itemData.name}" đã hết`);
+          }
+        }
+
+        orderItems.push({
+          name: itemData.name,
+          price: itemData.price,
+          quantity: req.quantity,
+          menuItemId: req.menuItemId,
+        });
+      }
+
+      // 7. All checks passed — write orders
+      const orderIds: string[] = [];
+      for (const item of orderItems) {
+        const orderRef = adminDb.collection('orders').doc();
+        transaction.set(orderRef, {
+          user_code: normalizedCode,
+          full_name: userData.full_name,
+          phone: userData.phone,
+          delivery_address: userData.delivery_address,
+          menu_date: menuDate,
+          menu_item_id: item.menuItemId,
+          item_name: item.name,
+          item_price: item.price,
+          quantity: item.quantity,
+          status: 'pending',
+          created_at: FieldValue.serverTimestamp(),
+        });
+        orderIds.push(orderRef.id);
+
+        // Update item ordered count
+        transaction.update(menuRef.collection('items').doc(item.menuItemId), {
+          ordered_count: FieldValue.increment(item.quantity),
+        });
+      }
 
       // Update user portions
       transaction.update(userRef, {
-        used_portions: FieldValue.increment(qty),
-        remaining_portions: FieldValue.increment(-qty),
-      });
-
-      // Update item ordered count
-      transaction.update(itemRef, {
-        ordered_count: FieldValue.increment(qty),
+        used_portions: FieldValue.increment(totalQty),
+        remaining_portions: FieldValue.increment(-totalQty),
       });
 
       return {
-        order_id: orderRef.id,
-        remaining_portions: userData.remaining_portions - qty,
-        item_name: itemData.name,
-        quantity: qty,
+        order_ids: orderIds,
+        remaining_portions: userData.remaining_portions - totalQty,
+        item_name: orderItems.length === 1 ? orderItems[0].name : `${orderItems.length} món`,
+        quantity: totalQty,
         delivery_address: userData.delivery_address,
       };
     });

@@ -125,38 +125,30 @@ export default function OrderPage() {
         .filter(it => (quantities[it.id] || 0) > 0)
         .map(it => ({ menuItemId: it.id, quantity: quantities[it.id] }));
 
-      // Gửi từng món (hoặc batch)
-      const results = await Promise.all(
-        selectedItems.map(({ menuItemId: itemId, quantity }) =>
-          fetch('/api/orders/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code: code.trim().toUpperCase(),
-              menuItemId: itemId,
-              menuDate,
-              quantity,
-            }),
-          }).then(r => r.json())
-        )
-      );
+      // Gửi tất cả món trong 1 request duy nhất (atomic transaction)
+      const res = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: code.trim().toUpperCase(),
+          menuDate,
+          items: selectedItems,
+        }),
+      });
+      const data = await res.json();
 
-      const failed = results.find(r => !r.success);
-      if (failed) {
-        setSubmitError(failed.error || 'Có lỗi xảy ra');
+      if (!data.success) {
+        setSubmitError(data.error || 'Có lỗi xảy ra');
         return;
       }
 
-      const firstResult = results[0];
       sessionStorage.setItem(
         'orderSuccess',
         JSON.stringify({
-          item_name: selectedItems.length > 1
-            ? `${selectedItems.length} món`
-            : allItems.find(it => it.id === selectedItems[0].menuItemId)?.name,
-          quantity: totalSelected,
-          delivery_address: firstResult.delivery_address,
-          remaining_portions: firstResult.remaining_portions,
+          item_name: data.item_name,
+          quantity: data.quantity,
+          delivery_address: data.delivery_address,
+          remaining_portions: data.remaining_portions,
         })
       );
       router.push('/success');
