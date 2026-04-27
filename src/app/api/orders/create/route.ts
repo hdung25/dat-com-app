@@ -85,15 +85,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 5. Check duplicate — 1 user chỉ được đặt 1 lần/ngày
-      const existingOrders = await adminDb.collection('orders')
-        .where('user_code', '==', normalizedCode)
-        .where('menu_date', '==', menuDate)
-        .limit(1)
-        .get();
-
-      if (!existingOrders.empty) {
-        throw new Error('Bạn đã đặt cơm hôm nay rồi. Mỗi người chỉ được đặt 1 lần/ngày.');
-      }
+      // 5. (No duplicate check — user can order multiple times per day before cutoff)
 
       // 6. Read all items and validate
       const itemDocs = await Promise.all(

@@ -291,10 +291,7 @@ export default function OrderPage() {
             </div>
           )}
 
-          {userInfo?.already_ordered && (
-            <Alert type="warning" className="mt-4">Bạn đã đặt cơm hôm nay rồi!</Alert>
-          )}
-          {userInfo && !userInfo.already_ordered && userInfo.remaining_portions <= 0 && (
+          {userInfo && userInfo.remaining_portions <= 0 && (
             <Alert type="error" className="mt-4">Không đủ suất. Bạn đã dùng hết suất ăn.</Alert>
           )}
         </div>
