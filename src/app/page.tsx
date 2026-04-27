@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Header from '@/components/layout/Header';
 import Link from 'next/link';
 import Badge from '@/components/ui/Badge';
+import { adminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,15 +43,74 @@ function formatPrice(price: number): string {
   return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
 }
 
+function getVietnamToday(): string {
+  const now = new Date();
+  const vnTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  const y = vnTime.getFullYear();
+  const m = String(vnTime.getMonth() + 1).padStart(2, '0');
+  const d = String(vnTime.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getVietnamNow(): { hours: number; minutes: number } {
+  const now = new Date();
+  const vnTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+  return { hours: vnTime.getHours(), minutes: vnTime.getMinutes() };
+}
+
 async function getMenu(): Promise<MenuResponse> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/menu/today`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error('Failed to fetch');
-    return await res.json();
-  } catch {
+    const today = getVietnamToday();
+
+    // Thử menu hôm nay trước
+    let menuDoc = await adminDb.collection('menus').doc(today).get();
+
+    if (!menuDoc.exists || !menuDoc.data()?.is_active) {
+      // Tìm menu active bất kỳ
+      const activeMenus = await adminDb
+        .collection('menus')
+        .where('is_active', '==', true)
+        .orderBy('date', 'asc')
+        .limit(1)
+        .get();
+
+      if (activeMenus.empty) {
+        return { menu: null, items: [], is_past_cutoff: false, cutoff_time: '', message: 'Chưa có menu hôm nay.' };
+      }
+      menuDoc = activeMenus.docs[0];
+    }
+
+    const menuData = menuDoc.data()!;
+    const menuDate = menuDoc.id;
+
+    // Kiểm tra giờ chốt
+    const { hours, minutes } = getVietnamNow();
+    const [cutoffH, cutoffM] = (menuData.cutoff_time || '09:00').split(':').map(Number);
+    const currentMinutes = hours * 60 + minutes;
+    const cutoffMinutes = cutoffH * 60 + cutoffM;
+    const isPastCutoff = menuDate === today && currentMinutes >= cutoffMinutes;
+
+    // Lấy danh sách món
+    const itemsSnapshot = await adminDb
+      .collection('menus')
+      .doc(menuDate)
+      .collection('items')
+      .where('is_available', '==', true)
+      .get();
+
+    const items = itemsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as MenuItemData[];
+
+    return {
+      menu: { date: menuDate, cutoff_time: menuData.cutoff_time, is_active: menuData.is_active },
+      items,
+      is_past_cutoff: isPastCutoff,
+      cutoff_time: menuData.cutoff_time,
+    };
+  } catch (error) {
+    console.error('getMenu error:', error);
     return { menu: null, items: [], is_past_cutoff: false, cutoff_time: '', message: 'Chưa có menu hôm nay.' };
   }
 }
