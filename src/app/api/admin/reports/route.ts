@@ -7,17 +7,21 @@ export async function GET(request: NextRequest) {
     const to = request.nextUrl.searchParams.get('to');
     const format = request.nextUrl.searchParams.get('format');
 
-    let query = adminDb.collection('orders').orderBy('created_at', 'desc');
-
-    // We can't do range queries on menu_date directly without Firestore
-    // composite indexes, so we fetch and filter
-    const snapshot = await query.limit(1000).get();
+    // Fetch all orders without orderBy (avoids composite index requirement)
+    const snapshot = await adminDb.collection('orders').limit(1000).get();
 
     let orders = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
       created_at: doc.data().created_at?.toDate?.()?.toISOString() || '',
     }));
+
+    // Sort by created_at descending in JS
+    orders.sort((a, b) => {
+      const ta = (a as Record<string, unknown>).created_at ? new Date((a as Record<string, unknown>).created_at as string).getTime() : 0;
+      const tb = (b as Record<string, unknown>).created_at ? new Date((b as Record<string, unknown>).created_at as string).getTime() : 0;
+      return tb - ta;
+    });
 
     // Filter by date range
     if (from) {

@@ -17,9 +17,9 @@ export async function GET(request: NextRequest) {
     const dateParam = request.nextUrl.searchParams.get('date');
     const date = dateParam || getVietnamToday();
 
+    // Query without orderBy to avoid composite index requirement
     const ordersSnapshot = await adminDb.collection('orders')
       .where('menu_date', '==', date)
-      .orderBy('created_at', 'desc')
       .get();
 
     const orders = ordersSnapshot.docs.map((doc) => ({
@@ -28,14 +28,17 @@ export async function GET(request: NextRequest) {
       created_at: doc.data().created_at?.toDate?.()?.toISOString() || '',
     }));
 
+    // Sort by created_at descending in JS
+    orders.sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at as string).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at as string).getTime() : 0;
+      return tb - ta;
+    });
+
     return NextResponse.json({ orders, date });
   } catch (error: unknown) {
-    const err = error as { code?: number };
-    if (err.code === 5 || err.code === 9) {
-      return NextResponse.json({ orders: [], date: getVietnamToday() });
-    }
     console.error('Orders list error:', error);
-    return NextResponse.json({ error: 'Lỗi hệ thống' }, { status: 500 });
+    return NextResponse.json({ orders: [], date: getVietnamToday() });
   }
 }
 

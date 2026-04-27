@@ -16,12 +16,11 @@ export async function GET() {
   try {
     const today = getVietnamToday();
 
-    // Today's orders
+    // Today's orders — no orderBy to avoid composite index requirement
     let orders: Record<string, unknown>[] = [];
     try {
       const ordersSnapshot = await adminDb.collection('orders')
         .where('menu_date', '==', today)
-        .orderBy('created_at', 'desc')
         .get();
 
       orders = ordersSnapshot.docs.map((doc) => ({
@@ -29,14 +28,15 @@ export async function GET() {
         ...doc.data(),
         created_at: doc.data().created_at?.toDate?.()?.toISOString() || '',
       }));
+
+      // Sort in JS
+      orders.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at as string).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at as string).getTime() : 0;
+        return tb - ta;
+      });
     } catch (err: unknown) {
-      const e = err as { code?: number; details?: string; message?: string };
-      if (e.code === 9) {
-        console.log('--- Firestore composite index required for orders ---');
-        console.log(e.details || e.message);
-      } else if (e.code !== 5) {
-        throw err;
-      }
+      console.error('Dashboard orders query error:', err);
     }
 
     // Compute stats from real order data

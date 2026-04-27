@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
     const snapshot = await adminDb.collection('notifications')
       .where('user_code', '==', userCode.toUpperCase())
       .where('is_read', '==', false)
-      .orderBy('created_at', 'desc')
       .limit(20)
       .get();
 
@@ -24,6 +23,12 @@ export async function GET(request: NextRequest) {
       ...doc.data(),
       created_at: doc.data().created_at?.toDate?.()?.toISOString() || '',
     }));
+
+    notifications.sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at as string).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at as string).getTime() : 0;
+      return tb - ta;
+    });
 
     return NextResponse.json({ notifications });
   } catch (error: unknown) {
