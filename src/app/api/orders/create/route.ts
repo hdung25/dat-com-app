@@ -118,8 +118,11 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 7. All checks passed — write orders
+      // 7. All checks passed — write orders with shared session_id
+      const sessionId = `${normalizedCode}-${Date.now()}`;
       const orderIds: string[] = [];
+      const totalAmount = orderItems.reduce((s, it) => s + it.price * it.quantity, 0);
+
       for (const item of orderItems) {
         const orderRef = adminDb.collection('orders').doc();
         transaction.set(orderRef, {
@@ -133,6 +136,9 @@ export async function POST(request: NextRequest) {
           item_price: item.price,
           quantity: item.quantity,
           status: 'pending',
+          session_id: sessionId,
+          session_total: totalAmount,
+          session_items_count: orderItems.length,
           created_at: FieldValue.serverTimestamp(),
         });
         orderIds.push(orderRef.id);
@@ -151,6 +157,7 @@ export async function POST(request: NextRequest) {
 
       return {
         order_ids: orderIds,
+        session_id: sessionId,
         remaining_portions: userData.remaining_portions - totalQty,
         item_name: orderItems.length === 1 ? orderItems[0].name : `${orderItems.length} món`,
         quantity: totalQty,
