@@ -1,0 +1,18 @@
+{
+  "name": "Super Chef — Đặt cơm nhanh",
+  "short_name": "Super Chef",
+  "description": "Đặt cơm nhanh chóng, tiện lợi. Hệ thống đặt cơm trả trước Super Chef.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0f9ff",
+  "theme_color": "#0891B2",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

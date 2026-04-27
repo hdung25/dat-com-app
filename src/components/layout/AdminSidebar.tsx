@@ -47,6 +47,16 @@ export default function AdminSidebar() {
 
         <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
           <Link
+            href="/admin/account"
+            className={`block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+              ${pathname.startsWith('/admin/account')
+                ? 'bg-orange-500 text-white'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              }`}
+          >
+            Tài khoản
+          </Link>
+          <Link
             href="/"
             className="block px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
           >

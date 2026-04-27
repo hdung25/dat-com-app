@@ -13,6 +13,8 @@ interface Order {
   delivery_address: string;
   status: string;
   created_at: string;
+  menu_item_id: string;
+  menu_date: string;
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
@@ -72,6 +74,22 @@ export default function AdminOrdersPage() {
       }
     } catch { alert('Lỗi cập nhật'); }
     finally { setUpdating(null); }
+  };
+
+  const markSoldOut = async (itemName: string, menuItemId: string) => {
+    if (!confirm(`Báo hết món "${itemName}"? Tất cả đơn chưa xử lý sẽ được thông báo cho khách.`)) return;
+    try {
+      const res = await fetch('/api/admin/sold-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menuDate: date, menuItemId, reason: `Món "${itemName}" đã hết. Vui lòng chọn món khác hoặc hủy đơn.` }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Đã báo hết! ${data.affected_orders} đơn bị ảnh hưởng, ${data.notified_users} khách được thông báo.`);
+        fetchOrders(date);
+      } else alert(data.error);
+    } catch { alert('Lỗi báo hết món'); }
   };
 
   const filtered = filter === 'all'
@@ -227,7 +245,7 @@ export default function AdminOrdersPage() {
                 )}
 
                 {/* Action buttons */}
-                {status !== 'completed' && status !== 'cancelled' && (
+                {status !== 'completed' && status !== 'cancelled' && status !== 'item_unavailable' && (
                   <div className="flex gap-2">
                     {status === 'pending' && (
                       <>
@@ -239,13 +257,20 @@ export default function AdminOrdersPage() {
                           {isUpdating ? '...' : 'Xác nhận'}
                         </button>
                         <button
+                          onClick={() => markSoldOut(order.item_name, order.menu_item_id)}
+                          disabled={isUpdating}
+                          className="px-3 py-2 border border-amber-200 text-amber-600 hover:bg-amber-50 text-xs font-medium rounded-lg transition-colors"
+                        >
+                          Báo hết
+                        </button>
+                        <button
                           onClick={() => {
                             if (confirm(`Hủy đơn của ${order.full_name}? Suất sẽ được hoàn lại.`)) {
                               updateStatus(order.id, 'cancelled');
                             }
                           }}
                           disabled={isUpdating}
-                          className="px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-medium rounded-lg transition-colors"
+                          className="px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-medium rounded-lg transition-colors"
                         >
                           Hủy
                         </button>
@@ -261,18 +286,30 @@ export default function AdminOrdersPage() {
                           {isUpdating ? '...' : 'Đã xong'}
                         </button>
                         <button
+                          onClick={() => markSoldOut(order.item_name, order.menu_item_id)}
+                          disabled={isUpdating}
+                          className="px-3 py-2 border border-amber-200 text-amber-600 hover:bg-amber-50 text-xs font-medium rounded-lg transition-colors"
+                        >
+                          Báo hết
+                        </button>
+                        <button
                           onClick={() => {
                             if (confirm(`Hủy đơn của ${order.full_name}? Suất sẽ được hoàn lại.`)) {
                               updateStatus(order.id, 'cancelled');
                             }
                           }}
                           disabled={isUpdating}
-                          className="px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-medium rounded-lg transition-colors"
+                          className="px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 text-xs font-medium rounded-lg transition-colors"
                         >
                           Hủy
                         </button>
                       </>
                     )}
+                  </div>
+                )}
+                {status === 'item_unavailable' && (
+                  <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-medium">
+                    ⚠ Món đã hết — đang chờ khách hàng chọn lại
                   </div>
                 )}
               </div>
