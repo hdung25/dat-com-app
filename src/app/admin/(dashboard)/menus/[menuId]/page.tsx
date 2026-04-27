@@ -42,6 +42,7 @@ export default function AdminMenuDetailPage() {
   const [addMode, setAddMode] = useState<'none' | 'library' | 'manual'>('none');
   const [libraryDishes, setLibraryDishes] = useState<LibraryDish[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set());
   const [maxQuantityMap, setMaxQuantityMap] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
@@ -70,6 +71,7 @@ export default function AdminMenuDetailPage() {
     setAddMode('library');
     setSelectedDishes(new Set());
     setMaxQuantityMap({});
+    setLibrarySearch('');
     setLibraryLoading(true);
     try {
       const res = await fetch('/api/admin/dishes');
@@ -241,50 +243,89 @@ export default function AdminMenuDetailPage() {
             </div>
           ) : (
             <>
+              {/* Search bar */}
+              <div className="relative mb-3">
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  width="15" height="15" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2"
+                >
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input
+                  type="text"
+                  value={librarySearch}
+                  onChange={e => setLibrarySearch(e.target.value)}
+                  placeholder="Tìm tên món..."
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 transition-colors"
+                />
+                {librarySearch && (
+                  <button
+                    onClick={() => setLibrarySearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6 6 18M6 6l12 12"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+
               <div className="space-y-2 mb-4 max-h-72 overflow-y-auto pr-1">
-                {libraryDishes.map(dish => {
-                  const alreadyAdded = items.some(i => i.name.toLowerCase() === dish.name.toLowerCase());
-                  const isSelected = selectedDishes.has(dish.id);
-                  return (
-                    <div
-                      key={dish.id}
-                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-colors cursor-pointer
-                        ${alreadyAdded
-                          ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                          : isSelected
-                          ? 'border-orange-400 bg-orange-50'
-                          : 'border-border hover:border-orange-200 bg-white'}`}
-                      onClick={() => !alreadyAdded && toggleSelect(dish.id)}
-                    >
-                      <div className={`w-5 h-5 rounded flex items-center justify-center border-2 shrink-0 transition-colors
-                        ${isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300'}`}>
-                        {isSelected && (
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
+                {(() => {
+                  const filtered = libraryDishes.filter(d =>
+                    d.name.toLowerCase().includes(librarySearch.toLowerCase())
+                  );
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-center text-sm text-gray-400 py-6">Không tìm thấy món nào.</p>
+                    );
+                  }
+                  return filtered.map(dish => {
+                    const alreadyAdded = items.some(i => i.name.toLowerCase() === dish.name.toLowerCase());
+                    const isSelected = selectedDishes.has(dish.id);
+                    return (
+                      <div
+                        key={dish.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-colors cursor-pointer
+                          ${alreadyAdded
+                            ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                            : isSelected
+                            ? 'border-orange-400 bg-orange-50'
+                            : 'border-border hover:border-orange-200 bg-white'}`}
+                        onClick={() => !alreadyAdded && toggleSelect(dish.id)}
+                      >
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 shrink-0 transition-colors
+                          ${isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-300'}`}>
+                          {isSelected && (
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-text-primary truncate">{dish.name}</p>
+                          <p className="text-xs text-text-secondary">{dish.price > 0 ? formatPrice(dish.price) : 'Chưa có giá'}</p>
+                        </div>
+                        {alreadyAdded && (
+                          <span className="text-xs text-gray-400 shrink-0">Đã có trong menu</span>
+                        )}
+                        {isSelected && !alreadyAdded && (
+                          <div className="shrink-0" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="number"
+                              placeholder="SL tối đa"
+                              value={maxQuantityMap[dish.id] || ''}
+                              onChange={e => setMaxQuantityMap(prev => ({ ...prev, [dish.id]: e.target.value }))}
+                              className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
+                            />
+                          </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-text-primary truncate">{dish.name}</p>
-                        <p className="text-xs text-text-secondary">{dish.price > 0 ? formatPrice(dish.price) : 'Chưa có giá'}</p>
-                      </div>
-                      {alreadyAdded && (
-                        <span className="text-xs text-gray-400 shrink-0">Đã có trong menu</span>
-                      )}
-                      {isSelected && !alreadyAdded && (
-                        <div className="shrink-0" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="number"
-                            placeholder="SL tối đa"
-                            value={maxQuantityMap[dish.id] || ''}
-                            onChange={e => setMaxQuantityMap(prev => ({ ...prev, [dish.id]: e.target.value }))}
-                            className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-border">

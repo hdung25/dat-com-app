@@ -11,6 +11,7 @@ interface Dish {
 export default function AdminDishesPage() {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dishSearch, setDishSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formName, setFormName] = useState('');
   const [formPrice, setFormPrice] = useState('');
@@ -98,6 +99,37 @@ export default function AdminDishesPage() {
         </button>
       </div>
 
+      {/* Search */}
+      {dishes.length > 0 && (
+        <div className="relative">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            width="15" height="15" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            value={dishSearch}
+            onChange={e => setDishSearch(e.target.value)}
+            placeholder="Tìm tên món..."
+            className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 transition-colors"
+          />
+          {dishSearch && (
+            <button
+              onClick={() => setDishSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Create form */}
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -153,7 +185,9 @@ export default function AdminDishesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {dishes.map((dish) => (
+              {dishes.filter(d => d.name.toLowerCase().includes(dishSearch.toLowerCase())).length === 0 ? (
+                <tr><td colSpan={3} className="px-4 py-10 text-center text-sm text-gray-400">Không tìm thấy món nào.</td></tr>
+              ) : dishes.filter(d => d.name.toLowerCase().includes(dishSearch.toLowerCase())).map((dish) => (
                 <tr key={dish.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     {editId === dish.id ? (

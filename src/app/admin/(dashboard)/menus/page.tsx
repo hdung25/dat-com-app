@@ -12,6 +12,7 @@ interface Menu {
 export default function AdminMenusPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuSearch, setMenuSearch] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newCutoff, setNewCutoff] = useState('09:00');
   const [creating, setCreating] = useState(false);
@@ -149,7 +150,37 @@ export default function AdminMenusPage() {
           Chưa có menu nào
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              width="15" height="15" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              type="text"
+              value={menuSearch}
+              onChange={e => setMenuSearch(e.target.value)}
+              placeholder="Tìm theo ngày (VD: 2026-04)..."
+              className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 transition-colors"
+            />
+            {menuSearch && (
+              <button
+                onClick={() => setMenuSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -160,7 +191,9 @@ export default function AdminMenusPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {menus.map((menu) => (
+              {menus.filter(m => m.date.includes(menuSearch)).length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-400">Không tìm thấy ngày nào.</td></tr>
+              ) : menus.filter(m => m.date.includes(menuSearch)).map((menu) => (
                 <tr key={menu.date} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">{menu.date}</td>
 
@@ -235,6 +268,7 @@ export default function AdminMenusPage() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>
