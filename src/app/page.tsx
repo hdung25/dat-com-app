@@ -3,6 +3,8 @@ import Header from '@/components/layout/Header';
 import Link from 'next/link';
 import Badge from '@/components/ui/Badge';
 
+export const dynamic = 'force-dynamic';
+
 interface MenuItemData {
   id: string;
   name: string;
@@ -44,7 +46,7 @@ async function getMenu(): Promise<MenuResponse> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const res = await fetch(`${baseUrl}/api/menu/today`, {
-      next: { revalidate: 60 },
+      cache: 'no-store',
     });
     if (!res.ok) throw new Error('Failed to fetch');
     return await res.json();
