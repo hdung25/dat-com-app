@@ -31,6 +31,11 @@ interface Session {
   status: string; // aggregated
 }
 
+interface DiscountInfo {
+  discount_type: 'percent' | 'amount' | '';
+  discount_value: string;
+}
+
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   pending:   { label: 'Chờ xử lý', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
   confirmed: { label: 'Đã xác nhận', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
@@ -99,6 +104,8 @@ export default function AdminOrdersPage() {
   const [filter, setFilter] = useState<string>('all');
   const [updating, setUpdating] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [discounts, setDiscounts] = useState<Record<string, DiscountInfo>>({});
+  const [savingDiscount, setSavingDiscount] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async (d: string) => {
     setLoading(true);
@@ -163,12 +170,56 @@ export default function AdminOrdersPage() {
     } catch { alert('Lỗi'); }
   };
 
-  const toggleExpand = (sid: string) => {
+  const toggleExpand = async (sid: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(sid)) next.delete(sid); else next.add(sid);
       return next;
     });
+    // Fetch discount info when expanding
+    if (!discounts[sid]) {
+      try {
+        const res = await fetch(`/api/admin/discount?sessionId=${sid}`);
+        const data = await res.json();
+        if (data.discount) {
+          setDiscounts(prev => ({
+            ...prev,
+            [sid]: {
+              discount_type: data.discount.discount_type || '',
+              discount_value: String(data.discount.discount_value || ''),
+            }
+          }));
+        } else {
+          setDiscounts(prev => ({ ...prev, [sid]: { discount_type: '', discount_value: '' } }));
+        }
+      } catch {
+        setDiscounts(prev => ({ ...prev, [sid]: { discount_type: '', discount_value: '' } }));
+      }
+    }
+  };
+
+  const saveDiscount = async (session: Session) => {
+    const info = discounts[session.session_id];
+    if (!info) return;
+    setSavingDiscount(session.session_id);
+    try {
+      const res = await fetch('/api/admin/discount', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: session.session_id,
+          discountType: info.discount_type || null,
+          discountValue: info.discount_value ? Number(info.discount_value) : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.removed ? 'Đã xóa giảm giá' : 'Đã lưu giảm giá!');
+      } else {
+        alert(data.error || 'Lỗi');
+      }
+    } catch { alert('Lỗi kết nối'); }
+    finally { setSavingDiscount(null); }
   };
 
   const sessions = groupToSessions(orders);
@@ -259,6 +310,15 @@ export default function AdminOrdersPage() {
                         <span className="font-mono text-xs font-bold text-orange-600">{session.user_code}</span>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${statusInfo.bg} ${statusInfo.color}`}>{statusInfo.label}</span>
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{session.items.length} món</span>
+                        {session.items.length > 1 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-600 border border-violet-200">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                            Combo
+                          </span>
+                        )}
+                        {session.items.length === 1 && (
+                          <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full font-medium border border-gray-200">Lẻ</span>
+                        )}
                       </div>
                       <p className="font-semibold text-gray-900 text-sm">{session.full_name}</p>
                       {session.phone && <p className="text-xs text-gray-400 mt-0.5">{session.phone}</p>}
@@ -334,12 +394,67 @@ export default function AdminOrdersPage() {
                       })}
                     </div>
 
-                    {/* Session total + actions */}
+                    {/* Session total + discount + actions */}
                     <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-xs text-gray-500 font-medium">Tổng đơn ({session.totalQty} suất)</span>
                         <span className="text-base font-extrabold text-gray-900">{fmt(session.totalAmount)}</span>
                       </div>
+
+                      {/* Discount section */}
+                      {session.status !== 'cancelled' && (
+                        <div className="mb-3 p-3 bg-white border border-gray-200 rounded-lg">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2">
+                              <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+                              <line x1="7" y1="7" x2="7.01" y2="7"/>
+                            </svg>
+                            <span className="text-xs font-bold text-gray-700">Giảm giá</span>
+                            {session.items.length > 1 && <span className="text-[10px] text-violet-500 font-medium">(Combo {session.items.length} món)</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={discounts[session.session_id]?.discount_type || ''}
+                              onChange={(e) => setDiscounts(prev => ({ ...prev, [session.session_id]: { ...prev[session.session_id] || { discount_value: '' }, discount_type: e.target.value as DiscountInfo['discount_type'] } }))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400"
+                            >
+                              <option value="">Không giảm</option>
+                              <option value="percent">% Phần trăm</option>
+                              <option value="amount">Số tiền</option>
+                            </select>
+                            {discounts[session.session_id]?.discount_type && (
+                              <input
+                                type="number"
+                                placeholder={discounts[session.session_id]?.discount_type === 'percent' ? 'VD: 10' : 'VD: 5000'}
+                                value={discounts[session.session_id]?.discount_value || ''}
+                                onChange={(e) => setDiscounts(prev => ({ ...prev, [session.session_id]: { ...prev[session.session_id], discount_value: e.target.value } }))}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1 px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-violet-400 min-w-0"
+                              />
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); saveDiscount(session); }}
+                              disabled={savingDiscount === session.session_id}
+                              className="px-3 py-1.5 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors shrink-0"
+                            >
+                              {savingDiscount === session.session_id ? '...' : 'Lưu'}
+                            </button>
+                          </div>
+                          {discounts[session.session_id]?.discount_type && discounts[session.session_id]?.discount_value && (
+                            <div className="mt-2 flex items-center justify-between text-xs">
+                              <span className="text-emerald-600 font-medium">Thành tiền:</span>
+                              <span className="font-extrabold text-emerald-700">
+                                {fmt(Math.max(0, session.totalAmount - (
+                                  discounts[session.session_id].discount_type === 'percent'
+                                    ? Math.round(session.totalAmount * Number(discounts[session.session_id].discount_value) / 100)
+                                    : Number(discounts[session.session_id].discount_value)
+                                )))}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Session-level actions */}
                       {session.status !== 'completed' && session.status !== 'cancelled' && (

@@ -39,14 +39,16 @@ export default function Header() {
         {/* Nav */}
         <nav className="flex items-center gap-3 text-sm font-medium">
           <Link
-            href="/check"
-            className="flex items-center gap-1.5 text-slate-600 hover:text-cyan-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-cyan-50"
+            href="/theo-doi-don"
+            className="text-slate-600 hover:text-cyan-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-cyan-50"
           >
-            {/* Search icon */}
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-            <span className="hidden sm:inline">Tra cứu</span>
+            Đơn hàng
+          </Link>
+          <Link
+            href="/check"
+            className="text-slate-600 hover:text-cyan-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-cyan-50"
+          >
+            Tra cứu
           </Link>
 
           {!loading && (
